@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+.env
+.n8n-demo/
+.n8n-demo-exports/
+.n8n-demo-credentials

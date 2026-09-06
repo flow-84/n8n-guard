@@ -1,0 +1,29 @@
+# A throwaway n8n instance to try n8n-guard against.
+#
+#   docker compose up -d
+#   N8N_URL=http://localhost:5678 N8N_SQLITE_PATH=$PWD/.n8n-demo/database.sqlite npm run start
+#
+# The data directory is bind-mounted so that n8n-guard can read database.sqlite
+# from the host, which is exactly how it works against a real deployment.
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n-guard-demo
+    restart: unless-stopped
+    ports:
+      - "${N8N_DEMO_PORT:-5678}:5678"
+    environment:
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - N8N_PUBLIC_API_DISABLED=false
+      - GENERIC_TIMEZONE=UTC
+      # Deliberately left off: n8n-guard's job is to report what unbounded
+      # retention costs, so the demo instance keeps everything.
+      - EXECUTIONS_DATA_PRUNE=false
+    volumes:
+      - ./.n8n-demo:/home/node/.n8n
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5678/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30

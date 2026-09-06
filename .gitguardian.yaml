@@ -1,0 +1,8 @@
+version: 2
+
+secret:
+  ignored-paths:
+    # This suite only reads credentials from the environment; the flagged lines
+    # are `N8N_API_KEY: <variable>` pairs, not stored values. Nothing in this
+    # repository contains a real key.
+    - test/integration/demoInstance.test.ts
