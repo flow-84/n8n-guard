@@ -10,7 +10,7 @@
 # anything outside the compose instance.
 set -euo pipefail
 
-N8N_URL="${N8N_URL:-http://localhost:${N8N_DEMO_PORT:-5678}}"
+N8N_URL="${N8N_URL:-http://localhost:${N8N_DEMO_PORT:-5679}}"
 EMAIL="${DEMO_EMAIL:-demo@example.com}"
 EXPORT_DIR="${EXPORT_DIR:-$PWD/.n8n-demo-exports}"
 
@@ -90,7 +90,11 @@ create_workflow "In sync" "https://example.com/in-sync" > "$EXPORT_DIR/in-sync.j
 # 2. A workflow that exists live but was never exported -> missing_in_git.
 create_workflow "Never exported" "https://example.com/never-exported" >/dev/null
 
-# 3. An export whose workflow no longer exists live -> missing_in_instance.
+# 3. A workflow that points at the sink container, which accepts the connection
+#    and never answers, so demo-stuck-run.sh can leave a run in `running`.
+create_workflow "Nightly sync" "http://demo-sink:5999/hang" >/dev/null
+
+# 4. An export whose workflow no longer exists live -> missing_in_instance.
 python3 - "$EXPORT_DIR/deleted-upstream.json" <<'PY'
 import json, sys
 json.dump({
@@ -101,7 +105,7 @@ json.dump({
 }, open(sys.argv[1], "w"), indent=2)
 PY
 
-# 4. Drift the "In sync" export so its content no longer matches -> content_drift.
+# 5. Drift the "In sync" export so its content no longer matches -> content_drift.
 python3 - "$EXPORT_DIR/in-sync.json" <<'PY'
 import json, sys
 path = sys.argv[1]

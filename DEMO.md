@@ -6,6 +6,26 @@ as of the commit this file ships with. Nothing here describes planned work.
 
 ## 1. Demo video script (screen recording, 2:00 maximum)
 
+### Recording it: one command
+
+```bash
+./scripts/record-demo.sh
+```
+
+It builds, starts the throwaway compose instance on port 5679, seeds it, starts
+the run that hangs, waits until that run is really visible as `running`, opens a
+Terminal window of its own and records only that window while
+`scripts/demo-play.mjs` drives the MCP server over stdio in the order below.
+Afterwards it stops the instance, deletes the file holding the API key and
+prints the path and length of the recording. The key is never on screen.
+
+macOS has to allow screen recording for the app the script runs in
+(System Settings > Privacy & Security > Screen & System Audio Recording).
+Without it the script stops before recording and says so.
+
+The section below is the content the script plays and the fallback for
+recording by hand.
+
 ### What has to be ready before the recording starts
 
 Do all of this before pressing record. None of it is on camera.
