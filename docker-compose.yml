@@ -1,7 +1,8 @@
-# A throwaway n8n instance to try n8n-guard against.
+# A throwaway n8n instance to try n8n-guard against. It listens on 5679 so it
+# cannot collide with a production n8n on the default port.
 #
 #   docker compose up -d
-#   N8N_URL=http://localhost:5678 N8N_SQLITE_PATH=$PWD/.n8n-demo/database.sqlite npm run start
+#   N8N_URL=http://localhost:5679 N8N_SQLITE_PATH=$PWD/.n8n-demo/database.sqlite npm run start
 #
 # The data directory is bind-mounted so that n8n-guard can read database.sqlite
 # from the host, which is exactly how it works against a real deployment.
@@ -11,7 +12,7 @@ services:
     container_name: n8n-guard-demo
     restart: unless-stopped
     ports:
-      - "${N8N_DEMO_PORT:-5678}:5678"
+      - "${N8N_DEMO_PORT:-5679}:5678"
     environment:
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_VERSION_NOTIFICATIONS_ENABLED=false
@@ -27,3 +28,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
+
+  # A TCP sink that accepts a connection and never answers. The "Nightly sync"
+  # workflow points at it, so demo-stuck-run.sh has something that really stays
+  # in `running` instead of a run that is only slow.
+  demo-sink:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n-guard-demo-sink
+    restart: unless-stopped
+    entrypoint: ["node", "-e", "require('net').createServer(() => {}).listen(5999)"]

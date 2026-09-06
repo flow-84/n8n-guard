@@ -6,6 +6,26 @@ as of the commit this file ships with. Nothing here describes planned work.
 
 ## 1. Demo video script (screen recording, 2:00 maximum)
 
+### Recording it: one command
+
+```bash
+./scripts/record-demo.sh
+```
+
+It builds, starts the throwaway compose instance on port 5679, seeds it, starts
+the run that hangs, waits until that run is really visible as `running`, opens a
+Terminal window of its own and records only that window while
+`scripts/demo-play.mjs` drives the MCP server over stdio in the order below.
+Afterwards it stops the instance, deletes the file holding the API key and
+prints the path and length of the recording. The key is never on screen.
+
+macOS has to allow screen recording for the app the script runs in
+(System Settings > Privacy & Security > Screen & System Audio Recording).
+Without it the script stops before recording and says so.
+
+The section below is the content the script plays and the fallback for
+recording by hand.
+
 ### What has to be ready before the recording starts
 
 Do all of this before pressing record. None of it is on camera.
@@ -39,7 +59,7 @@ Do all of this before pressing record. None of it is on camera.
 
 | Time | On screen | What is said or typed | What the viewer sees |
 |---|---|---|---|
-| 0:00 - 0:08 | n8n UI, Overview | nothing typed | Two workflows, no error banner, no warning. The instance looks healthy. |
+| 0:00 - 0:08 | n8n UI, Overview | nothing typed | Three workflows, no error banner, no warning. The instance looks healthy. |
 | 0:08 - 0:16 | n8n UI, Executions list | nothing typed | A run sitting in `running`. It looks exactly like a healthy long job. Caption: "The UI cannot tell you this one is never coming back." |
 | 0:16 - 0:24 | n8n UI, Settings, n8n API | nothing typed | Caption: "The Public API has no endpoint for database size, no baseline for a stuck run, and no idea what git holds." |
 | 0:24 - 0:40 | MCP client | Call `stuck_executions` with `threshold_minutes: 1` | Summary lines: `1 of 1 running executions are stuck`, and the reason line naming both the threshold and the multiple of that workflow's own median. |

@@ -169,20 +169,22 @@ docker compose up -d
 
 The script generates the owner password, keeps it in the gitignored
 `.n8n-demo-credentials`, and prints it along with the environment block to run
-the server with. It seeds one
-workflow that matches its export, one that was never exported, and one export
-whose workflow does not exist, so `git_drift` has something real to find.
+the server with. It seeds one workflow that matches its export, one that was
+never exported, one that points at a sink container so a run can hang, and one
+export whose workflow does not exist, so `git_drift` and `stuck_executions`
+have something real to find.
 
 ```bash
-export N8N_URL=http://localhost:5678
+export N8N_URL=http://localhost:5679
 export N8N_API_KEY=...            # printed by the script
 export N8N_SQLITE_PATH=$PWD/.n8n-demo/database.sqlite
 export N8N_GIT_REPO_PATH=$PWD/.n8n-demo-exports
 npm start
 ```
 
-Use `N8N_DEMO_PORT=5679 docker compose up -d` if port 5678 is already taken by
-an instance you care about.
+The instance publishes on 5679, not on n8n's default 5678, so it cannot collide
+with an instance you care about. Set `N8N_DEMO_PORT` to move it, and pass the
+same value to `demo-setup.sh`, the integration tests and `N8N_URL`.
 
 ## Tests
 

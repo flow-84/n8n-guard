@@ -5,3 +5,5 @@ dist/
 .n8n-demo/
 .n8n-demo-exports/
 .n8n-demo-credentials
+.n8n-demo-env
+.n8n-demo-recording/
