@@ -76,6 +76,51 @@ Do all of this before pressing record. None of it is on camera.
 | 1:45 - 1:54 | MCP client, scrolled to the JSON payload | nothing typed | The per-step array: `attempts`, `durationMs`, `status` per step. The retries are in the payload, not in a slide. |
 | 1:54 - 2:00 | Same terminal or the README | nothing typed | Closing card: `github.com/flow-84/n8n-guard`, "read-only, six checks, MIT". |
 
+### If you record it from Multica instead of a desktop MCP client
+
+The timeline above assumes a chat style MCP client. Recording it from the
+Multica app works too and needs three changes. Agent runs on this machine are
+Claude Code processes, so they take their MCP servers from the user scope config
+in `~/.claude.json`, not from a client UI.
+
+1. Register the server once for every agent run on this runtime, in the terminal
+   that is not recorded:
+   ```bash
+   claude mcp add n8n-guard --scope user \
+     -e N8N_URL=http://localhost:5678 \
+     -e N8N_API_KEY=<the key demo-setup.sh printed> \
+     -e N8N_SQLITE_PATH=/absolute/path/to/n8n-guard/.n8n-demo/database.sqlite \
+     -e N8N_GIT_REPO_PATH=/absolute/path/to/n8n-guard/.n8n-demo-exports \
+     -- node /absolute/path/to/n8n-guard/dist/index.js
+
+   multica --profile desktop-localhost-8080 daemon restart
+   multica --profile desktop-localhost-8080 daemon status
+   ```
+   The restart is what makes a new run pick the server up. `daemon status` has to
+   say running before you continue.
+2. Create one issue in the Multica board that carries the whole demo as its
+   order, and assign it to an agent. Write the order so the agent pastes the raw
+   tool output into its comment rather than summarising it, otherwise the video
+   shows prose instead of the product:
+
+   > Call the n8n-guard MCP tools in this order and paste each answer verbatim,
+   > including the summary lines and the JSON payload:
+   > 1. `stuck_executions` with `threshold_minutes: 1`
+   > 2. `git_drift`
+   > 3. `guard_run`
+   > Then stop and wait for my next comment. Do not fix anything, do not change
+   > the instance, this is a read only demo.
+
+3. Record the Multica window: the issue with the order, the run, and the comment
+   with the output. Then stop the instance in the prepared terminal
+   (`docker compose stop n8n`), comment `now run guard_run again and paste the
+   answer verbatim` on the same issue, and record the second run coming back as
+   `## Guard run (degraded)`.
+
+Cutting: an agent run takes longer than the slot it gets in the video. Record the
+whole thing, then cut the waiting out. The timings in the table stay as they are,
+they describe the finished video and not the recording session.
+
 ### Rules for the recording
 
 - No intro, no talking head at the start, no logo animation. The first five
