@@ -36,7 +36,14 @@ WINDOW_ID=""
 # Whatever happens - a failed recording, a Ctrl-C - the demo instance and the
 # file holding the API key do not survive this script.
 cleanup() {
-  [ -n "$WINDOW_ID" ] && osascript -e "tell application \"Terminal\" to close (every window whose id is $WINDOW_ID)" >/dev/null 2>&1
+  # Terminal asks "do you want to terminate the running process?" when a window
+  # is closed while something still runs in it. The player is stopped first, so
+  # the window closes without a dialog nobody is there to answer.
+  pkill -f "scripts/demo-play.mjs" >/dev/null 2>&1
+  if [ -n "$WINDOW_ID" ]; then
+    sleep 1
+    osascript -e "tell application \"Terminal\" to close (every window whose id is $WINDOW_ID)" >/dev/null 2>&1
+  fi
   docker compose down >/dev/null 2>&1
   rm -f "$ENV_FILE"
   return 0
@@ -87,9 +94,12 @@ print(int(max(ages)) if ages else -1)'
 }
 
 for _ in $(seq 1 60); do
-  AGE="$(started_seconds_ago || echo -1)"
-  [ "${AGE:--1}" -ge "$STUCK_AGE_SECONDS" ] && break
-  printf '\r   running execution age: %ss / %ss' "${AGE:--1}" "$STUCK_AGE_SECONDS"
+  # One integer, always: a failed curl or an unparseable answer must not turn
+  # into an empty or multi-line value that breaks the comparison below.
+  AGE="$(started_seconds_ago 2>/dev/null | tr -dc '0-9-\n' | tail -1)"
+  case "$AGE" in ''|*[!0-9-]*) AGE=-1 ;; esac
+  [ "$AGE" -ge "$STUCK_AGE_SECONDS" ] && break
+  printf '\r   running execution age: %ss / %ss' "$AGE" "$STUCK_AGE_SECONDS"
   sleep 5
 done
 printf '\n'
@@ -101,7 +111,7 @@ say "recording"
 BOUNDS="$(osascript <<APPLESCRIPT
 tell application "Terminal"
   activate
-  do script "cd $ROOT && clear && DEMO_DONE_MARKER=$MARKER ./scripts/demo-play.mjs"
+  do script "cd $ROOT && clear && DEMO_DONE_MARKER=$MARKER ./scripts/demo-play.mjs; exit"
   set demoWindow to front window
   set number of columns of demoWindow to $COLUMNS_ON_CAMERA
   set number of rows of demoWindow to $ROWS_ON_CAMERA
@@ -113,6 +123,12 @@ tell application "Terminal"
 end tell
 APPLESCRIPT
 )"
+# osascript stays silent when Automation access to Terminal is refused; without
+# bounds there is nothing to record, so say which switch is missing.
+case "$BOUNDS" in
+  *,*,*,*,*) : ;;
+  *) echo "could not drive Terminal via AppleScript (got: '$BOUNDS'). Grant this app control of Terminal in System Settings > Privacy & Security > Automation, then run this script again." >&2; exit 1 ;;
+esac
 X1="${BOUNDS%%,*}"; REST="${BOUNDS#*,}"
 Y1="${REST%%,*}"; REST="${REST#*,}"
 X2="${REST%%,*}"; REST="${REST#*,}"
@@ -122,7 +138,10 @@ RECT="$X1,$Y1,$((X2 - X1)),$((Y2 - Y1))"
 # screencapture -v is denied on this machine even when still screenshots are
 # allowed, and it fails silently. ffmpeg's avfoundation capture works, so the
 # full screen is recorded and cropped to the demo window afterwards.
-SCREEN_IDX="$(ffmpeg -f avfoundation -list_devices true -i "" 2>&1 | sed -n 's/^.*\[\([0-9]*\)\] Capture screen 0$/\1/p' | head -1)"
+# Listing devices is how avfoundation reports them, and it always exits with an
+# error afterwards ("Error opening input"). Under `pipefail` that error would
+# end the script right here, so it is swallowed deliberately.
+SCREEN_IDX="$({ ffmpeg -f avfoundation -list_devices true -i "" 2>&1 || true; } | sed -n 's/^.*\[\([0-9]*\)\] Capture screen 0$/\1/p' | head -1)"
 [ -n "$SCREEN_IDX" ] || { echo "no 'Capture screen' device found in avfoundation" >&2; exit 1; }
 RAW="$OUT_DIR/.raw-$(date +%s).mkv"
 ffmpeg -y -loglevel error -f avfoundation -framerate 15 -i "$SCREEN_IDX" "$RAW" </dev/null &
@@ -155,7 +174,10 @@ wait "$REC_PID" 2>/dev/null || true
 [ -s "$RAW" ] || { echo "no video was written to $RAW; check Screen Recording permission." >&2; exit 1; }
 # avfoundation records in device pixels, the window bounds are in points.
 PX_W="$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$RAW")"
-PT_W="$(osascript -e 'tell application "Finder" to get item 3 of (bounds of window of desktop)')"
+# Asking Finder for the desktop size times out whenever Finder is busy, and the
+# script would lose a finished recording over it. NSScreen answers directly.
+PT_W="$(osascript -l JavaScript -e 'ObjC.import("AppKit"); String($.NSScreen.mainScreen.frame.size.width)' 2>/dev/null || true)"
+case "$PT_W" in ''|*[!0-9.]*) PT_W="$PX_W" ;; esac
 CROP="$(python3 - "$PX_W" "$PT_W" "$X1" "$Y1" "$X2" "$Y2" <<'PYEOF'
 import sys
 px_w, pt_w, x1, y1, x2, y2 = (int(float(v)) for v in sys.argv[1:7])
