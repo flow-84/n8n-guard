@@ -20,15 +20,29 @@ Do all of this before pressing record. None of it is on camera.
    workflows (`In sync`, `Never exported`) and two exports, one of which was
    deliberately drifted and one whose workflow does not exist live. So
    `git_drift` has three real findings without any staging during the recording.
-2. Export the environment in the terminal you will record, then start the server
-   in your MCP client (Claude Desktop or any other client) against exactly those
-   variables:
-   ```bash
-   export N8N_URL=http://localhost:5678
-   export N8N_API_KEY=...                 # printed by demo-setup.sh
-   export N8N_SQLITE_PATH=$PWD/.n8n-demo/database.sqlite
-   export N8N_GIT_REPO_PATH=$PWD/.n8n-demo-exports
+2. Put the configuration into the MCP client, not into a shell. Paste the values
+   `demo-setup.sh` printed into the client config (Claude Desktop:
+   `~/Library/Application Support/Claude/claude_desktop_config.json`) and restart
+   the client:
+   ```json
+   {
+     "mcpServers": {
+       "n8n-guard": {
+         "command": "node",
+         "args": ["/absolute/path/to/n8n-guard/dist/index.js"],
+         "env": {
+           "N8N_URL": "http://localhost:5678",
+           "N8N_API_KEY": "<the key demo-setup.sh printed>",
+           "N8N_SQLITE_PATH": "/absolute/path/to/n8n-guard/.n8n-demo/database.sqlite",
+           "N8N_GIT_REPO_PATH": "/absolute/path/to/n8n-guard/.n8n-demo-exports"
+         }
+       }
+     }
+   }
    ```
+   The client reads the key from that file, so the key never has to be typed in a
+   terminal and cannot end up on screen. Confirm it works by calling
+   `instance_info` once before recording: it must answer `reachable`.
 3. Produce a baseline and a genuinely stuck run:
    - In the n8n UI, execute `Never exported` three times. Those finished runs are
      what the median baseline is derived from.
@@ -37,10 +51,15 @@ Do all of this before pressing record. None of it is on camera.
      Timeout to `3600000` ms. Save, execute manually once, leave it running.
    - Wait about three minutes before recording. The run then sits in `running`
      far past its own median, which is what `stuck_executions` is built to catch.
-4. Two windows only: the browser with the n8n UI, and the MCP client. Close
-   everything else, hide notifications, and make sure no API key is readable on
-   screen. The key is visible in the shell history of the terminal, so do not
-   record that terminal.
+4. Prepare exactly the three surfaces that get recorded, and nothing else:
+   - **Browser** with the n8n UI, on the Overview page.
+   - **MCP client** with the n8n-guard server connected.
+   - **One terminal window** for the single command at 1:10. Open a new window,
+     run `cd /path/to/n8n-guard`, then `clear`. That window is now empty, holds
+     no API key and shows no earlier commands. Do not reuse the window that ran
+     `demo-setup.sh`: its scrollback and its history contain the key.
+   Then hide notifications, close every other window, and check the n8n UI itself
+   for the key: Settings, n8n API shows the key label only, never the value.
 
 ### Timeline
 
@@ -52,10 +71,10 @@ Do all of this before pressing record. None of it is on camera.
 | 0:24 - 0:40 | MCP client | Call `stuck_executions` with `threshold_minutes: 1` | Summary lines: `1 of 1 running executions are stuck`, and the reason line naming both the threshold and the multiple of that workflow's own median. |
 | 0:40 - 0:58 | MCP client | Call `git_drift` | `3 differences across 2 live and 2 exported workflows`, broken down into `content_drift`, `missing_in_git`, `missing_in_instance`, each with the file it came from. |
 | 0:58 - 1:10 | MCP client | Call `guard_run` | All six checks complete: instance, datastore, db_health, retention, stuck_executions, git_drift. One call, one report. |
-| 1:10 - 1:20 | Terminal, second window | `docker compose stop n8n` | The instance is now down. This is the incident, not a reason to stop monitoring. |
+| 1:10 - 1:20 | The prepared empty terminal | `docker compose stop n8n` | The instance is now down. This is the incident, not a reason to stop monitoring. |
 | 1:20 - 1:45 | MCP client | Call `guard_run` again | Header reads `## Guard run (degraded)`. Findings name `stuck_executions failed after 3 attempt(s)` and `git_drift failed after 2 attempt(s)`, then `4 of 6 checks completed despite the failures above`. Disk and retention answers are still there, read straight from the SQLite file. |
 | 1:45 - 1:54 | MCP client, scrolled to the JSON payload | nothing typed | The per-step array: `attempts`, `durationMs`, `status` per step. The retries are in the payload, not in a slide. |
-| 1:54 - 2:00 | Terminal or README | nothing typed | Closing card: `github.com/flow-84/n8n-guard`, "read-only, six checks, MIT". |
+| 1:54 - 2:00 | Same terminal or the README | nothing typed | Closing card: `github.com/flow-84/n8n-guard`, "read-only, six checks, MIT". |
 
 ### Rules for the recording
 
