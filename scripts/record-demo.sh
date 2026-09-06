@@ -39,6 +39,8 @@ cleanup() {
   # Terminal asks "do you want to terminate the running process?" when a window
   # is closed while something still runs in it. The player is stopped first, so
   # the window closes without a dialog nobody is there to answer.
+  # A recorder left behind holds the capture device and blocks the next run.
+  [ -n "${REC_PID:-}" ] && kill -9 "$REC_PID" >/dev/null 2>&1
   pkill -f "scripts/demo-play.mjs" >/dev/null 2>&1
   if [ -n "$WINDOW_ID" ]; then
     sleep 1
@@ -105,13 +107,34 @@ done
 printf '\n'
 [ "${AGE:--1}" -ge "$STUCK_AGE_SECONDS" ] || { echo "no execution stayed in 'running'; is the demo-sink container up?" >&2; exit 1; }
 
+# screencapture -v is denied on this machine even when still screenshots are
+# allowed, and it fails silently. ffmpeg's avfoundation capture works, so the
+# full screen is recorded and cropped to the demo window afterwards.
+# Listing devices is how avfoundation reports them, and it always exits with an
+# error afterwards ("Error opening input"). Under `pipefail` that error would
+# end the script right here, so it is swallowed deliberately.
+SCREEN_IDX="$({ ffmpeg -f avfoundation -list_devices true -i "" 2>&1 || true; } | sed -n 's/^.*\[\([0-9]*\)\] Capture screen 0$/\1/p' | head -1)"
+[ -n "$SCREEN_IDX" ] || { echo "no 'Capture screen' device found in avfoundation" >&2; exit 1; }
+
+# A denied recording does not fail loudly: ffmpeg keeps running and never writes
+# a frame. Two seconds into a throwaway file answer that question before the
+# demo starts, instead of guessing from the size of a half-buffered mkv.
+PROBE="$OUT_DIR/.probe-$$.mkv"
+ffmpeg -y -loglevel error -f avfoundation -framerate 15 -i "$SCREEN_IDX" -t 2 "$PROBE" </dev/null >/dev/null 2>&1 || true
+if [ ! -s "$PROBE" ]; then
+  rm -f "$PROBE"
+  echo "ffmpeg captured nothing: macOS denies screen recording to the app this script runs in. Grant it in System Settings > Privacy & Security > Screen & System Audio Recording, then run this script again." >&2
+  exit 1
+fi
+rm -f "$PROBE"
+
 say "recording"
 # A window of its own, sized in characters, so the recording holds the demo and
 # nothing else that happens to be on the desktop.
 BOUNDS="$(osascript <<APPLESCRIPT
 tell application "Terminal"
   activate
-  do script "cd $ROOT && clear && DEMO_DONE_MARKER=$MARKER ./scripts/demo-play.mjs; exit"
+  do script "cd $ROOT && clear && sleep 5 && DEMO_DONE_MARKER=$MARKER ./scripts/demo-play.mjs; exit"
   set demoWindow to front window
   set number of columns of demoWindow to $COLUMNS_ON_CAMERA
   set number of rows of demoWindow to $ROWS_ON_CAMERA
@@ -135,34 +158,18 @@ X2="${REST%%,*}"; REST="${REST#*,}"
 Y2="${REST%%,*}"; WINDOW_ID="${REST#*,}"
 RECT="$X1,$Y1,$((X2 - X1)),$((Y2 - Y1))"
 
-# screencapture -v is denied on this machine even when still screenshots are
-# allowed, and it fails silently. ffmpeg's avfoundation capture works, so the
-# full screen is recorded and cropped to the demo window afterwards.
-# Listing devices is how avfoundation reports them, and it always exits with an
-# error afterwards ("Error opening input"). Under `pipefail` that error would
-# end the script right here, so it is swallowed deliberately.
-SCREEN_IDX="$({ ffmpeg -f avfoundation -list_devices true -i "" 2>&1 || true; } | sed -n 's/^.*\[\([0-9]*\)\] Capture screen 0$/\1/p' | head -1)"
-[ -n "$SCREEN_IDX" ] || { echo "no 'Capture screen' device found in avfoundation" >&2; exit 1; }
 RAW="$OUT_DIR/.raw-$(date +%s).mkv"
-ffmpeg -y -loglevel error -f avfoundation -framerate 15 -i "$SCREEN_IDX" "$RAW" </dev/null &
+ffmpeg -y -loglevel error -f avfoundation -framerate 15 -i "$SCREEN_IDX" "$RAW" </dev/null >/dev/null 2>&1 &
 REC_PID=$!
-# A denied recording does not fail loudly: the process keeps running and never
-# writes anything. The output file growing is the signal that it really records.
-for _ in $(seq 1 20); do
-  [ -s "$RAW" ] && break
-  sleep 0.5
-done
-if [ ! -s "$RAW" ]; then
-  kill -9 "$REC_PID" 2>/dev/null || true
-  echo "ffmpeg wrote nothing: macOS denies screen recording to the app this script runs in. Grant it in System Settings > Privacy & Security > Screen & System Audio Recording, then run this script again." >&2
-  exit 1
-fi
+sleep 2
+kill -0 "$REC_PID" 2>/dev/null || { echo "the screen recording died right after it started" >&2; exit 1; }
 
 for _ in $(seq 1 340); do
   [ -f "$MARKER" ] && break
   sleep 0.5
 done
-sleep 1
+# No grace period: the player writes the marker after its closing frame, and a
+# second of waiting only records the window shutting down.
 kill -INT "$REC_PID" 2>/dev/null || true
 for _ in $(seq 1 30); do
   kill -0 "$REC_PID" 2>/dev/null || break
