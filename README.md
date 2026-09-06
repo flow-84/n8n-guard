@@ -1,5 +1,10 @@
 # n8n-guard
 
+[![npm](https://img.shields.io/npm/v/n8n-guard.svg)](https://www.npmjs.com/package/n8n-guard)
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-io.github.flow--84%2Fn8n--guard-blue)](https://registry.modelcontextprotocol.io/v0/servers?search=n8n-guard)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org)
+
 An MCP server for the operational layer *underneath* the n8n Public API.
 
 Every n8n MCP server on the registry today is a wrapper around the same public
@@ -31,10 +36,11 @@ executions, and never activates or edits a workflow. It reports; you decide.
 ## Install
 
 ```bash
-npm install -g n8n-guard
+npx -y n8n-guard
 ```
 
-Requires Node.js 22 or newer (it uses the built-in `node:sqlite`).
+Requires Node.js 22 or newer (it uses the built-in `node:sqlite`). For a
+permanent install use `npm install -g n8n-guard`.
 
 ### Claude Desktop / any MCP client
 
@@ -86,6 +92,44 @@ report that they are unconfigured and the rest of the run continues.
 | `retention_report` | Execution count, age span, and what pruning to a retention window would free. |
 | `git_drift` | Live workflows against the repository exports: missing, deleted, drifted, duplicated. |
 | `guard_run` | All of the above in one resilient sweep. This is the one to schedule. |
+
+## Example call
+
+Point the server at an instance and let your client call a tool. Every tool
+answers with a readable summary first and the full structured payload after it:
+
+```
+## Retention report
+- 200 execution records spanning 8.3 days (24.1/day)
+- nothing older than 30 days, retention is already tight
+- n8n-guard never deletes. To act on this, set EXECUTIONS_DATA_PRUNE=true and
+  EXECUTIONS_DATA_MAX_AGE=720 (hours) on the n8n instance, then restart it.
+```
+
+followed by the structured payload the summary was derived from:
+
+```json
+{
+  "executionCount": 200,
+  "oldestExecutionAt": "2026-08-28T23:43:28.651Z",
+  "spanDays": 8.29,
+  "executionsPerDay": 24.12,
+  "buckets": [
+    { "olderThanDays": 7, "rows": 32, "share": 0.16, "estimatedBytes": 3277 },
+    { "olderThanDays": 30, "rows": 0, "share": 0, "estimatedBytes": 0 }
+  ]
+}
+```
+
+`guard_run` wraps all six checks. With only a datastore configured it reports
+the gap instead of aborting:
+
+```
+## Guard run (degraded)
+- stuck_executions failed after 3 attempt(s): N8N_API_KEY is not set, so the n8n Public API cannot be queried
+- git_drift failed after 2 attempt(s): N8N_GIT_REPO_PATH is not set, so there is nothing to diff the instance against
+- 4 of 6 checks completed despite the failures above
+```
 
 ## Recovery: `guard_run` survives a partial outage
 

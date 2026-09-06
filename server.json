@@ -1,0 +1,82 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.flow-84/n8n-guard",
+  "title": "n8n-guard",
+  "description": "Read-only health checks for self-hosted n8n: datastore growth, stuck runs, retention, git drift.",
+  "version": "0.1.0",
+  "websiteUrl": "https://github.com/flow-84/n8n-guard#readme",
+  "repository": {
+    "url": "https://github.com/flow-84/n8n-guard",
+    "source": "github",
+    "id": "1358812935"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "n8n-guard",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "N8N_URL",
+          "description": "Base URL of the n8n instance. Defaults to http://localhost:5678.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "N8N_API_KEY",
+          "description": "n8n Public API key. Required for the execution and workflow checks.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "N8N_SQLITE_PATH",
+          "description": "Path to the n8n database.sqlite file. Required for datastore checks on SQLite.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "N8N_POSTGRES_URL",
+          "description": "Postgres connection string. Takes precedence over N8N_SQLITE_PATH.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "N8N_GIT_REPO_PATH",
+          "description": "Checkout holding exported workflow JSON. Required for the git drift check.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "N8N_GUARD_STUCK_MINUTES",
+          "description": "Minutes a run may stay in `running` before it counts as stuck. Defaults to 15.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "N8N_GUARD_DB_WARN_BYTES",
+          "description": "Datastore warning threshold in bytes. Defaults to 1073741824 (1 GB).",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "N8N_GUARD_DB_CRITICAL_BYTES",
+          "description": "Datastore critical threshold in bytes. Defaults to 4294967296 (4 GB).",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "N8N_GUARD_TIMEOUT_MS",
+          "description": "Per-request API timeout in milliseconds. Defaults to 15000.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
