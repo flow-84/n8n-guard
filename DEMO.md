@@ -59,7 +59,7 @@ Do all of this before pressing record. None of it is on camera.
 
 | Time | On screen | What is said or typed | What the viewer sees |
 |---|---|---|---|
-| 0:00 - 0:08 | n8n UI, Overview | nothing typed | Two workflows, no error banner, no warning. The instance looks healthy. |
+| 0:00 - 0:08 | n8n UI, Overview | nothing typed | Three workflows, no error banner, no warning. The instance looks healthy. |
 | 0:08 - 0:16 | n8n UI, Executions list | nothing typed | A run sitting in `running`. It looks exactly like a healthy long job. Caption: "The UI cannot tell you this one is never coming back." |
 | 0:16 - 0:24 | n8n UI, Settings, n8n API | nothing typed | Caption: "The Public API has no endpoint for database size, no baseline for a stuck run, and no idea what git holds." |
 | 0:24 - 0:40 | MCP client | Call `stuck_executions` with `threshold_minutes: 1` | Summary lines: `1 of 1 running executions are stuck`, and the reason line naming both the threshold and the multiple of that workflow's own median. |

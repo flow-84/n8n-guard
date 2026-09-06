@@ -14,7 +14,8 @@ import { GuardService } from "../../src/guard/service.js";
  * real n8n schema, and that a full run degrades gracefully against a live
  * instance whose Public API is not reachable for this process.
  */
-const N8N_URL = process.env.N8N_URL ?? "http://localhost:5678";
+const DEMO_PORT = process.env.N8N_DEMO_PORT ?? "5679";
+const N8N_URL = process.env.N8N_URL ?? `http://localhost:${DEMO_PORT}`;
 // Read once into locals: an inline `KEY: process.env.KEY` pair reads to secret
 // scanners as a hardcoded high-entropy value even though nothing is stored here.
 const API_KEY = process.env.N8N_API_KEY;
