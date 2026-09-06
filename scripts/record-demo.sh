@@ -16,7 +16,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
 OUT_DIR="${DEMO_OUT_DIR:-$ROOT/.n8n-demo-recording}"
-OUT="${DEMO_OUT:-$OUT_DIR/n8n-guard-demo-$(date +%Y%m%d-%H%M%S).mov}"
+OUT="${DEMO_OUT:-$OUT_DIR/n8n-guard-demo-$(date +%Y%m%d-%H%M%S).mp4}"
 ENV_FILE="$ROOT/.n8n-demo-env"
 MARKER="$OUT_DIR/.play-done"
 # 5679, not 5678: the demo must never reach a production n8n on the default port.
@@ -119,17 +119,23 @@ X2="${REST%%,*}"; REST="${REST#*,}"
 Y2="${REST%%,*}"; WINDOW_ID="${REST#*,}"
 RECT="$X1,$Y1,$((X2 - X1)),$((Y2 - Y1))"
 
-screencapture -v -x -V 170 -R"$RECT" "$OUT" &
+# screencapture -v is denied on this machine even when still screenshots are
+# allowed, and it fails silently. ffmpeg's avfoundation capture works, so the
+# full screen is recorded and cropped to the demo window afterwards.
+SCREEN_IDX="$(ffmpeg -f avfoundation -list_devices true -i "" 2>&1 | sed -n 's/^.*\[\([0-9]*\)\] Capture screen 0$/\1/p' | head -1)"
+[ -n "$SCREEN_IDX" ] || { echo "no 'Capture screen' device found in avfoundation" >&2; exit 1; }
+RAW="$OUT_DIR/.raw-$(date +%s).mkv"
+ffmpeg -y -loglevel error -f avfoundation -framerate 15 -i "$SCREEN_IDX" "$RAW" </dev/null &
 REC_PID=$!
-# A denied recording does not fail loudly: screencapture keeps running and never
-# writes anything. The output file appearing is the signal that it really records.
+# A denied recording does not fail loudly: the process keeps running and never
+# writes anything. The output file growing is the signal that it really records.
 for _ in $(seq 1 20); do
-  [ -f "$OUT" ] && break
+  [ -s "$RAW" ] && break
   sleep 0.5
 done
-if [ ! -f "$OUT" ]; then
+if [ ! -s "$RAW" ]; then
   kill -9 "$REC_PID" 2>/dev/null || true
-  echo "screencapture wrote nothing: macOS denies screen recording to the app this script runs in. Grant it in System Settings > Privacy & Security > Screen & System Audio Recording, then run this script again." >&2
+  echo "ffmpeg wrote nothing: macOS denies screen recording to the app this script runs in. Grant it in System Settings > Privacy & Security > Screen & System Audio Recording, then run this script again." >&2
   exit 1
 fi
 
@@ -146,6 +152,21 @@ done
 kill -9 "$REC_PID" 2>/dev/null || true
 wait "$REC_PID" 2>/dev/null || true
 
-[ -s "$OUT" ] || { echo "no video was written to $OUT; check Screen Recording permission." >&2; exit 1; }
+[ -s "$RAW" ] || { echo "no video was written to $RAW; check Screen Recording permission." >&2; exit 1; }
+# avfoundation records in device pixels, the window bounds are in points.
+PX_W="$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$RAW")"
+PT_W="$(osascript -e 'tell application "Finder" to get item 3 of (bounds of window of desktop)')"
+CROP="$(python3 - "$PX_W" "$PT_W" "$X1" "$Y1" "$X2" "$Y2" <<'PYEOF'
+import sys
+px_w, pt_w, x1, y1, x2, y2 = (int(float(v)) for v in sys.argv[1:7])
+s = px_w / pt_w
+even = lambda v: int(v) - (int(v) % 2)
+print(f"crop={even((x2-x1)*s)}:{even((y2-y1)*s)}:{even(x1*s)}:{even(y1*s)}")
+PYEOF
+)"
+ffmpeg -y -loglevel error -i "$RAW" -vf "$CROP" -pix_fmt yuv420p "$OUT"
+rm -f "$RAW"
+
+[ -s "$OUT" ] || { echo "cropping produced no file at $OUT" >&2; exit 1; }
 DURATION="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT" 2>/dev/null || echo "?")"
 printf '\nvideo: %s\nlength: %s seconds (limit 120)\n' "$OUT" "$DURATION"
