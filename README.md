@@ -153,6 +153,15 @@ This behaviour is covered by tests in `test/unit/runner.test.ts` and
 `test/unit/serviceRecovery.test.ts`, the latter running a real SQLite datastore
 against a deliberately dead API endpoint.
 
+## Render Workflows
+
+The same sweep also runs as a [Render Workflow](https://render.com/docs/workflows):
+one Render task per check, with ordering, retries and backoff declared in the
+task definitions and executed by Render rather than by the in-process runner.
+Deploy steps, the task table and how to trigger a run (including a deliberate
+failure that demonstrates the retry path) are in
+[`docs/render-workflow.md`](docs/render-workflow.md).
+
 ## Try it on a throwaway instance
 
 The compose file starts a fresh n8n you can safely point the server at. The data
