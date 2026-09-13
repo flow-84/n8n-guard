@@ -180,17 +180,13 @@ Workflows - Render (render): build a background process that completes a task an
 **Evidence for that challenge**
 
 ```
-guard_run is the background process. It runs six checks in one sweep and is built so that a failing step does not end the run.
+Technology: Render Workflows. guard_run is deployed as the Render Workflow "n8n-guard" (workflow wfl-daj4mh95efls73fiv63g, version wfv-daj4mhh5efls73fiv6a0, built from main at cae91bc, region frankfurt).
 
-How it recovers, in the code: src/guard/runner.ts runs every step in isolation. A step declares its own retry count and is retried with backoff. If it still fails, the error is turned into a finding and the sweep continues with the next step. A step that declares a dependency on a step that did not succeed is skipped with the reason attached instead of crashing on missing input. The report carries per-step status, attempt count and duration, and is flagged degraded whenever anything failed or was skipped.
+Role: every guard check is its own Render task (instance, datastore, db_health, retention, stuck_executions, git_drift, plus flaky_probe). guard_run fans them out with ctx.run: four in parallel, db_health and retention after the datastore stats. Ordering, retries and backoff are declared in the task definitions in src/workflow/tasks.ts and executed by Render, not by our own runner. A task that exhausts its Render retries becomes a finding, the run still completes.
 
-What that looks like when the n8n API is gone: instance, datastore, db_health and retention still complete out of the datastore file, stuck_executions fails after 3 attempts, git_drift fails after 2, and the report says "4 of 6 checks completed despite the failures above" rather than returning nothing.
+Recorded run: task run trn-09d4gdaj4nadg1s2s739dk3ng, started 2026-09-13T07:07:21Z, completed 2026-09-13T07:08:06Z, status completed. flaky_probe (trn-09d4gdaj4nb0a21bg00afql4g) failed three times on purpose and succeeded on attempt 4 after Render's 5s/10s/20s backoff. stuck_executions took 3 attempts and datastore and git_drift 2 each before Render gave up; the report came back degraded with "2 of 7 checks completed despite the failures above" instead of aborting. All checks are read-only, so no retry can duplicate an action.
 
-Proof that runs without our instance: test/unit/serviceRecovery.test.ts builds a real n8n-shaped SQLite database in a temp directory and points the API at 127.0.0.1:9, a port that reliably refuses connections. It asserts that the datastore, db_health and retention steps come back ok, that the API-backed steps are reported as failed after their retries, and that the failures appear in the findings instead of being swallowed. test/unit/runner.test.ts covers the step engine itself, including skip on failed dependency.
-
-Reproduce: npm install && npm test. 56 unit tests across 7 files, all passing on Node 22 or newer.
-
-In the demo video: 1:10 stops the n8n container, 1:20 shows the same guard_run coming back degraded with the numbers above.
+Verify: in the Render dashboard open Workflows > n8n-guard > task runs, or, with a Render API key of the workflow owner as Bearer token (without it the API returns 401), GET https://api.render.com/v1/task-runs?rootTaskRunId=trn-09d4gdaj4nadg1s2s739dk3ng to see every subtask with its attempt history. Reproduce: npm run workflow:trigger -- --keep-days 30 --demo-retry 20 (docs/render-workflow.md).
 ```
 
 **Which AI was used to build it**
