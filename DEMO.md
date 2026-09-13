@@ -180,13 +180,13 @@ Workflows - Render (render): build a background process that completes a task an
 **Evidence for that challenge**
 
 ```
-Technology: Render Workflows. guard_run is deployed as the Render Workflow "n8n-guard" (workflow wfl-daj4mh95efls73fiv63g, version wfv-daj4mhh5efls73fiv6a0, built from main at cae91bc, region oregon).
+Technology: Render Workflows. guard_run is deployed as the Render Workflow "n8n-guard" (workflow wfl-daj4mh95efls73fiv63g, version wfv-daj4mhh5efls73fiv6a0, built from main at cae91bc, region frankfurt).
 
 Role: every guard check is its own Render task (instance, datastore, db_health, retention, stuck_executions, git_drift, plus flaky_probe). guard_run fans them out with ctx.run: four in parallel, db_health and retention after the datastore stats. Ordering, retries and backoff are declared in the task definitions in src/workflow/tasks.ts and executed by Render, not by our own runner. A task that exhausts its Render retries becomes a finding, the run still completes.
 
 Recorded run: task run trn-09d4gdaj4nadg1s2s739dk3ng, started 2026-09-13T07:07:21Z, completed 2026-09-13T07:08:06Z, status completed. flaky_probe (trn-09d4gdaj4nb0a21bg00afql4g) failed three times on purpose and succeeded on attempt 4 after Render's 5s/10s/20s backoff. stuck_executions took 3 attempts and datastore and git_drift 2 each before Render gave up; the report came back degraded with "2 of 7 checks completed despite the failures above" instead of aborting. All checks are read-only, so no retry can duplicate an action.
 
-Verify: in the Render dashboard open Workflows > n8n-guard > task runs, or GET https://api.render.com/v1/task-runs?rootTaskRunId=trn-09d4gdaj4nadg1s2s739dk3ng to see every subtask with its attempt history. Reproduce: npm run workflow:trigger -- --keep-days 30 --demo-retry 20 (docs/render-workflow.md).
+Verify: in the Render dashboard open Workflows > n8n-guard > task runs, or, with a Render API key of the workflow owner as Bearer token (without it the API returns 401), GET https://api.render.com/v1/task-runs?rootTaskRunId=trn-09d4gdaj4nadg1s2s739dk3ng to see every subtask with its attempt history. Reproduce: npm run workflow:trigger -- --keep-days 30 --demo-retry 20 (docs/render-workflow.md).
 ```
 
 **Which AI was used to build it**
