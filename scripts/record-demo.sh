@@ -33,18 +33,23 @@ mkdir -p "$OUT_DIR"
 rm -f "$MARKER"
 
 WINDOW_ID=""
+WINDOW_TTY=""
 # Whatever happens - a failed recording, a Ctrl-C - the demo instance and the
 # file holding the API key do not survive this script.
 cleanup() {
-  # Terminal asks "do you want to terminate the running process?" when a window
-  # is closed while something still runs in it. The player is stopped first, so
-  # the window closes without a dialog nobody is there to answer.
   # A recorder left behind holds the capture device and blocks the next run.
   [ -n "${REC_PID:-}" ] && kill -9 "$REC_PID" >/dev/null 2>&1
-  pkill -f "scripts/demo-play.mjs" >/dev/null 2>&1
-  if [ -n "$WINDOW_ID" ]; then
+  # Terminal puts up "Do you want to terminate running processes?" whenever a
+  # window is closed while ANYTHING still runs in it - the player, the sleep in
+  # front of it, or the login shell itself. Killing every process on that
+  # window's tty leaves nothing to ask about, so the window closes silently.
+  MY_TTY="$(ps -o tty= -p $$ 2>/dev/null | tr -d ' ')"
+  if [ -n "${WINDOW_TTY:-}" ] && [ "${WINDOW_TTY#/dev/}" != "$MY_TTY" ]; then
+    pkill -9 -t "${WINDOW_TTY#/dev/}" >/dev/null 2>&1
     sleep 1
-    osascript -e "tell application \"Terminal\" to close (every window whose id is $WINDOW_ID)" >/dev/null 2>&1
+  fi
+  if [ -n "$WINDOW_ID" ]; then
+    osascript -e "tell application \"Terminal\" to close (every window whose id is $WINDOW_ID) saving no" >/dev/null 2>&1
   fi
   docker compose down >/dev/null 2>&1
   rm -f "$ENV_FILE"
@@ -142,20 +147,22 @@ tell application "Terminal"
   delay 1
   set b to bounds of demoWindow
   set demoId to id of demoWindow
-  return ((item 1 of b) as text) & "," & ((item 2 of b) as text) & "," & ((item 3 of b) as text) & "," & ((item 4 of b) as text) & "," & (demoId as text)
+  set demoTty to tty of selected tab of demoWindow
+  return ((item 1 of b) as text) & "," & ((item 2 of b) as text) & "," & ((item 3 of b) as text) & "," & ((item 4 of b) as text) & "," & (demoId as text) & "," & (demoTty as text)
 end tell
 APPLESCRIPT
 )"
 # osascript stays silent when Automation access to Terminal is refused; without
 # bounds there is nothing to record, so say which switch is missing.
 case "$BOUNDS" in
-  *,*,*,*,*) : ;;
+  *,*,*,*,*,*) : ;;
   *) echo "could not drive Terminal via AppleScript (got: '$BOUNDS'). Grant this app control of Terminal in System Settings > Privacy & Security > Automation, then run this script again." >&2; exit 1 ;;
 esac
 X1="${BOUNDS%%,*}"; REST="${BOUNDS#*,}"
 Y1="${REST%%,*}"; REST="${REST#*,}"
 X2="${REST%%,*}"; REST="${REST#*,}"
-Y2="${REST%%,*}"; WINDOW_ID="${REST#*,}"
+Y2="${REST%%,*}"; REST="${REST#*,}"
+WINDOW_ID="${REST%%,*}"; WINDOW_TTY="${REST#*,}"
 RECT="$X1,$Y1,$((X2 - X1)),$((Y2 - Y1))"
 
 RAW="$OUT_DIR/.raw-$(date +%s).mkv"
