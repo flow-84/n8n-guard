@@ -212,6 +212,6 @@ async function readPostgresStats(connectionString: string): Promise<DatastoreSta
 /** SQLite stores timestamps as text or epoch millis depending on the n8n version. */
 function normalizeTimestamp(value: string | number | null): string | null {
   if (value === null || value === undefined) return null;
-  const date = typeof value === "number" ? new Date(value) : new Date(value);
+  const date = new Date(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toISOString();
 }
