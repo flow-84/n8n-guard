@@ -7,8 +7,8 @@
 
 An MCP server for the operational layer *underneath* the n8n Public API.
 
-Every n8n MCP server on the registry today is a wrapper around the same public
-endpoints: list workflows, list executions, create, activate, delete. That is
+Most n8n MCP servers on the registry wrap the same public endpoints: list
+workflows, list executions, create, activate, delete. That is
 useful for building workflows. It is close to useless for keeping a self-hosted
 instance alive, because the things that actually take an instance down are not
 in that API at all.
